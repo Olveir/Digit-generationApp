@@ -1,55 +1,54 @@
 import streamlit as st
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-# Load the trained model
-class DigitGenerator(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(28 * 28, 256),
-            nn.ReLU(),
-            nn.Linear(256, 64)
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(64 + 10, 256),
-            nn.ReLU(),
-            nn.Linear(256, 28 * 28),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x, labels):
-        x = self.encoder(x.view(-1, 28 * 28))
-        x = torch.cat([x, labels], dim=1)
-        x = self.decoder(x)
-        return x.view(-1, 1, 28, 28)
-
-@st.cache_resource
-def load_model():
-    model = DigitGenerator()
-    model.load_state_dict(torch.load("models/mnist_generator.pth", map_location=torch.device('cpu')))
-    model.eval()
-    return model
-
+# One-hot encoding
 def one_hot(label, num_classes=10):
     return torch.eye(num_classes)[label]
 
-st.title("MNIST Digit Generator")
-digit = st.number_input("Enter a digit (0–9)", min_value=0, max_value=9, step=1)
+# CVAE Model
+class CVAE(nn.Module):
+    def __init__(self, latent_dim=20):
+        super(CVAE, self).__init__()
+        self.latent_dim = latent_dim
+        self.encoder = nn.Sequential(
+            nn.Linear(28*28 + 10, 400),
+            nn.ReLU()
+        )
+        self.fc_mu = nn.Linear(400, latent_dim)
+        self.fc_logvar = nn.Linear(400, latent_dim)
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim + 10, 400),
+            nn.ReLU(),
+            nn.Linear(400, 28*28),
+            nn.Sigmoid()
+        )
 
-if st.button("Generate Images"):
+    def decode(self, z, y):
+        zy = torch.cat([z, y], dim=1)
+        return self.decoder(zy).view(-1, 1, 28, 28)
+
+@st.cache_resource
+def load_model():
+    model = CVAE()
+    model.load_state_dict(torch.load("models/cvae_mnist.pth", map_location=torch.device('cpu')))
+    model.eval()
+    return model
+
+# App
+st.title("Handwritten Digit Image Generator")
+digit = st.number_input("Enter digit (0–9)", min_value=0, max_value=9)
+
+if st.button("Generate"):
     model = load_model()
-    imgs = []
-    for _ in range(5):
-        noise = torch.rand(1, 1, 28, 28)
-        label = one_hot(torch.tensor([digit]))
-        gen = model(noise, label).detach().numpy().squeeze()
-        imgs.append(gen)
+    label = one_hot(torch.tensor([digit]*5))
+    z = torch.randn(5, model.latent_dim)
+    with torch.no_grad():
+        samples = model.decode(z, label).squeeze().numpy()
 
     fig, axs = plt.subplots(1, 5, figsize=(10, 2))
     for i, ax in enumerate(axs):
-        ax.imshow(imgs[i], cmap='gray')
+        ax.imshow(samples[i], cmap='gray')
         ax.axis('off')
     st.pyplot(fig)
