@@ -1,6 +1,7 @@
 import streamlit as st
 import torch
 import torch.nn as nn
+<<<<<<< HEAD
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
@@ -23,6 +24,25 @@ class SimpleUNet(nn.Module):
             nn.Conv2d(2, 32, 3, padding=1), nn.ReLU(),
             nn.Conv2d(32, 32, 3, padding=1), nn.ReLU(),
             nn.Conv2d(32, 1, 3, padding=1)
+=======
+import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
+
+# Load the trained model
+class DigitGenerator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(28 * 28, 256),
+            nn.ReLU(),
+            nn.Linear(256, 64)
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(64 + 10, 256),
+            nn.ReLU(),
+            nn.Linear(256, 28 * 28),
+            nn.Sigmoid()
+>>>>>>> parent of 3c6be57 (Update app.py)
         )
     
     def forward(self, x, labels):
@@ -30,6 +50,7 @@ class SimpleUNet(nn.Module):
         x_cat = torch.cat([x, label_img], dim=1)
         return self.model(x_cat)
 
+<<<<<<< HEAD
 # Carregar modelo
 @st.cache_resource
 def load_model():
@@ -59,16 +80,38 @@ def sample(model, digit, n=5):
 # App
 st.title("Handwritten Digit Image Generator")
 digit = st.number_input("Enter digit (0–9)", min_value=0, max_value=9)
+=======
+    def forward(self, x, labels):
+        x = self.encoder(x.view(-1, 28 * 28))
+        x = torch.cat([x, labels], dim=1)
+        x = self.decoder(x)
+        return x.view(-1, 1, 28, 28)
 
-if st.button("Generate"):
+@st.cache_resource
+def load_model():
+    model = DigitGenerator()
+    model.load_state_dict(torch.load("models/mnist_generator.pth", map_location=torch.device('cpu')))
+    model.eval()
+    return model
+
+def one_hot(label, num_classes=10):
+    return torch.eye(num_classes)[label]
+>>>>>>> parent of 3c6be57 (Update app.py)
+
+st.title("MNIST Digit Generator")
+digit = st.number_input("Enter a digit (0–9)", min_value=0, max_value=9, step=1)
+
+if st.button("Generate Images"):
     model = load_model()
-    label = one_hot(torch.tensor([digit]*5))
-    z = torch.randn(5, model.latent_dim)
-    with torch.no_grad():
-        samples = model.decode(z, label).squeeze().numpy()
+    imgs = []
+    for _ in range(5):
+        noise = torch.rand(1, 1, 28, 28)
+        label = one_hot(torch.tensor([digit]))
+        gen = model(noise, label).detach().numpy().squeeze()
+        imgs.append(gen)
 
     fig, axs = plt.subplots(1, 5, figsize=(10, 2))
     for i, ax in enumerate(axs):
-        ax.imshow(samples[i], cmap='gray')
+        ax.imshow(imgs[i], cmap='gray')
         ax.axis('off')
     st.pyplot(fig)
