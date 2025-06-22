@@ -52,12 +52,3 @@ if st.button("Generate"):
         ax.imshow(samples[i], cmap='gray')
         ax.axis('off')
     st.pyplot(fig)
-
-
-import psutil
-import streamlit as st
-
-process = psutil.Process()
-mem = process.memory_info().rss / (1024 ** 2)  # em MB
-st.write(f"Uso de memória: {mem:.2f} MB")
-
